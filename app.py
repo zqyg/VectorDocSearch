@@ -33,10 +33,10 @@ app.config['MAX_CONTENT_LENGTH'] = MAX_CONTENT_LENGTH
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 # Pinecone configuration
-PINECONE_API_KEY = os.environ.get('PINECONE_API_KEY', 'pcsk_4Voo5e_ooC5BBCLdcNdKjZBim3aXf4FnLgvUGv6xmzg515BqmgSZRiFY8ERZV7msbiEwa')
-PINECONE_ENVIRONMENT = os.environ.get('PINECONE_ENVIRONMENT', 'us-east-1')
-PINECONE_INDEX = os.environ.get('PINECONE_INDEX', 'student')
-EMBEDDING_API_URL = os.environ.get('EMBEDDING_API_URL', 'https://zqqqqygy-embeddingservice.hf.space')
+PINECONE_API_KEY = os.environ.get('PINECONE_API_KEY', 'pcsk_3j8EYZ_aXgqmciqjA3fhuBgq8bBz2G1cYFbZ4PRdnrMwwres9UsRUPdYjgyKKHH2a7Uz3')
+PINECONE_ENVIRONMENT = os.environ.get('PINECONE_ENVIRONMENT', 'us-west1-gcp')
+PINECONE_INDEX = os.environ.get('PINECONE_INDEX', 'ragdata')
+HUGGINGFACE_TOKEN = os.environ.get('HUGGINGFACE_TOKEN', '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')
 
 # Initialize Pinecone
 pc = None
@@ -54,8 +54,8 @@ try:
                 dimension=384,  # all-MiniLM-L6-v2 embedding dimension
                 metric="cosine",
                 spec=ServerlessSpec(
-                    cloud='aws',
-                    region='us-east-1'
+                    cloud='gcp',
+                    region='us-west1'
                 )
             )
         
@@ -83,10 +83,10 @@ def get_file_hash(filepath):
 def get_embedding(text):
     """Get embedding from Hugging Face hosted service"""
     try:
-        # Use Gradio client for Hugging Face embedding service
+        # Use Gradio client for Hugging Face embedding service with authentication
         from gradio_client import Client
         
-        client = Client("ZQqqqygy/embeddingservice")
+        client = Client("ZQqqqygy/embeddingservice", hf_token=HUGGINGFACE_TOKEN)
         result = client.predict(
             text=text,
             api_name="/predict"
