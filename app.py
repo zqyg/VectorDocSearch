@@ -8,7 +8,8 @@ from pinecone import Pinecone, ServerlessSpec
 from dotenv import load_dotenv
 import hashlib
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
+from google.cloud import storage
 
 # Load environment variables
 load_dotenv()
@@ -38,9 +39,15 @@ PINECONE_ENVIRONMENT = os.environ.get('PINECONE_ENVIRONMENT', 'us-west1-gcp')
 PINECONE_INDEX = os.environ.get('PINECONE_INDEX', 'student')
 HUGGINGFACE_TOKEN = os.environ.get('HUGGINGFACE_TOKEN', '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')
 
-# Initialize Pinecone
+# Google Cloud Storage configuration
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "zelio.json"
+BUCKET_NAME = "studentpdf"
+
+# Initialize Pinecone and Google Cloud Storage
 pc = None
 index = None
+storage_client = storage.Client()
+bucket = storage_client.bucket(BUCKET_NAME)
 
 try:
     if PINECONE_API_KEY:
@@ -137,7 +144,6 @@ def index_route():
 def upload():
     """Handle document upload"""
     if request.method == 'POST':
-        # Check if file was uploaded
         if 'file' not in request.files:
             flash('No file selected', 'error')
             return redirect(request.url)
@@ -163,47 +169,55 @@ def upload():
                 timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_')
                 filename = timestamp + filename
 
-                # Save file
-                filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-                file.save(filepath)
+                # Create a temporary file to get hash
+                temp_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                file.save(temp_path)
+                file_hash = get_file_hash(temp_path)
 
-                # Get file hash for unique ID
-                file_hash = get_file_hash(filepath)
+                # Upload to Google Cloud Storage
+                blob = bucket.blob(filename)
+                blob.upload_from_filename(temp_path)
+                
+                # Remove temporary file
+                os.remove(temp_path)
 
                 # Get embedding for description
                 embedding = get_embedding(description)
 
                 if embedding and index:
-                    # Store in Pinecone
+                    # Store in Pinecone with GCS metadata
                     metadata = {
                         'filename': filename,
                         'original_filename': file.filename,
                         'description': description,
                         'upload_date': datetime.now().isoformat(),
-                        'file_size': os.path.getsize(filepath)
+                        'file_size': blob.size,
+                        'gcs_path': f"gs://{BUCKET_NAME}/{filename}"
                     }
 
                     # Upsert to Pinecone
                     try:
                         index.upsert(
-                            vectors=[
-                                {
-                                    "id": file_hash,
-                                    "values": embedding,
-                                    "metadata": metadata
-                                }
-                            ]
+                            vectors=[{
+                                "id": file_hash,
+                                "values": embedding,
+                                "metadata": metadata
+                            }]
                         )
                         app.logger.info(f"Successfully indexed document with ID: {file_hash}")
                     except Exception as pinecone_error:
                         app.logger.error(f"Pinecone upsert failed: {str(pinecone_error)}")
+                        # Delete from GCS if Pinecone fails
+                        blob.delete()
                         raise pinecone_error
 
                     flash(f'Document "{file.filename}" uploaded successfully!', 'success')
                     app.logger.info(f"Document uploaded and indexed: {filename}")
                 else:
-                    flash('Document uploaded but indexing failed. Search may not work properly.', 'warning')
-                    app.logger.warning(f"Document uploaded but not indexed: {filename}")
+                    # Delete from GCS if indexing fails
+                    blob.delete()
+                    flash('Document upload failed - indexing error', 'error')
+                    app.logger.warning(f"Document not indexed: {filename}")
 
                 return redirect(url_for('upload'))
 
@@ -283,9 +297,15 @@ def search():
 
 @app.route('/download/<filename>')
 def download_file(filename):
-    """Download uploaded file"""
+    """Download file from Google Cloud Storage using a signed URL"""
     try:
-        return send_from_directory(app.config['UPLOAD_FOLDER'], filename, as_attachment=True)
+        blob = bucket.blob(filename)
+        url = blob.generate_signed_url(
+            version="v4",
+            expiration=timedelta(minutes=15),
+            method="GET"
+        )
+        return redirect(url)
     except Exception as e:
         app.logger.error(f"Error downloading file {filename}: {str(e)}")
         flash('File not found or cannot be downloaded', 'error')

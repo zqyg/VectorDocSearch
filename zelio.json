@@ -1,0 +1,13 @@
+{
+  "type": "service_account",
+  "project_id": "zelio-455416",
+  "private_key_id": "2c7e4963ac8470d96eab9a5777cc1211d0d75cdd",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDht/kY8xQt1bL5\nQcpHpRWxXjQ12rfP0A3bFFnzDCiuh4uH9PBKrVI32ZLiS8Y+QYhVQHMPlATq38Rt\nGHl1RCuBqyEz4i1U0ChQ0bHSsRmmjSj1xSPAicCqQkUC7Y1D0f5471ZazwYsZWtR\nQMeo+iJMY5PeLxOW1LOXrd+QHZrxNBIyzmL1bMd8J+zCejRZQIEPlZHRENUTREGJ\nbrmT9R+geU3U78A2Y37jekjvnvWJkM/sJqCoRg4qOACJn/OFBFzlQNNU1YQ3WfYo\nAICDPMS0wAWS8yc13tIjansTA1bBE1IuYrYXMJh+nZkMx2cN8EFXgMUfPaH4gpbr\nO2vnryhnAgMBAAECggEAB2jNHGSnH58/5tu7tdQokDzZ6Bl1mc5Bri5B8TvPpNvR\nMjwEz60jbkiBM4l7CMJVvqRFD3ImvF9uqLztbvKEBReNGV40aiM2t5Ryl5dCeTIL\nPqoWgHSYWcTSh1D59D7f8Um8YwwgFUDNBlevvI9dcdyw8J58Y6HSAjAhQkjrTaPK\npLItVC3Hja1U3hdAxl7OPyjbNh2j2TEw7Ck1P5lBTYTfafyPTehBwXqlLXc+05ce\nYSS4aHnvM4+Di9ZxEQ7mgeMDfBUMZmlptF3UTk/iN8219GbEDpmK7UxnbT6dIc6S\n05TRxuePnGRmGWF0/D+4BJ06BQtbiGUDF4jTM/vv9QKBgQD7NQTVYFQtTbczWr1v\n8IVUqh8nVL6iB2Hy9kTkKOTZGKS03r61nev+JN0gWt6M6YYBUZe80zRWiDmuSVw7\nPypYmgZl6rqkkDu7yP/xZI50KKwy7tUrxZAyB5am9jPH1RVBem5loGtAqG7QuiZw\nY3qH2sDLb9NyTPWPsX0zpjiqSwKBgQDmBnW3VQPJJKL+2YVIWeHt0cw9mlym09TS\nntt16OdBvPEtRgS3PdSuvq9n8jKlwxHeAa6DccjGOPbS2IkbX88YzHghk+GUC9wu\nqga5905HosFHbJEFtllqVCU7YozyMwJ54OsMoeEXcMuicr1WL0jj3tKVIrDQawZi\nQNtq1zFo1QKBgFYBkwQTFP7lysF0YcN/j8aq8DuhEhubd3edxXxwW9nQTCP410aL\nKQ88Q9EeC3AnS9ALxW3KyfKOdWEskL1gJPls0p/2O6y4DRt/99EH4pX2ju5pQubX\nn0ThwDytspDKbZqbdkypHc9nW3lvIlX8WSlGRhfg034gxzpJRFp4oJH9AoGARbg/\nhcnm09ie7s/PbhaQPB0S4rkezBH4t74elqZ5MZurHiXS2BeNl0mEsOTgJQ3zJG8u\nDfk2+Z3ach3fsMRhaQrQfpzsCottuVcfos4qk9vo6VUmv6x9fZTzlARS5DZB0d8y\nXynRp+EwV5SffrfmR+sJuNpC7WkDDlTKLJ/9AeECgYEAlpxRxeOa3eLChOtdZGjQ\nUVMGWRRegmI11clTQrM66Rr3VCJjFcOeHzCpaGhum5kZq/D4TDHlgxpsrtzYfurm\nk/efS4TjQXKIEF0aNB0Rs4xrOK+Jg8kE11KkWtLrL/cPrpyRrI9ozrHY3u/xT+a0\n8KOeSDRznq33ZwjYulA6qTc=\n-----END PRIVATE KEY-----\n",
+  "client_email": "miza-ai@zelio-455416.iam.gserviceaccount.com",
+  "client_id": "115095807957907737152",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/miza-ai%40zelio-455416.iam.gserviceaccount.com",
+  "universe_domain": "googleapis.com"
+}
