@@ -76,8 +76,13 @@
             <div class="divide-y divide-gray-200">
                 {% for result in results %}
                     <div class="p-6 hover:bg-gray-50 transition-colors">
-                        <div class="flex items-start justify-between">
-                            <div class="flex-1 min-w-0">
+                        <div class="flex items-start">
+                            <!-- Rank Number -->
+                            <div class="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 text-gray-600 font-semibold text-sm">
+                                {{ result.rank }}
+                            </div>
+                            
+                            <div class="flex-1 min-w-0 ml-4">
                                 <!-- Document Header -->
                                 <div class="flex items-center mb-2">
                                     <div class="flex-shrink-0">
@@ -93,9 +98,14 @@
                                     <h3 class="ml-3 text-lg font-medium text-gray-900 truncate">
                                         {{ result.filename }}
                                     </h3>
-                                    <div class="ml-3 flex items-center text-sm text-green-600">
-                                        <i class="fas fa-chart-bar mr-1"></i>
-                                        <span>{{ (result.score * 100)|round(1) }}% match</span>
+                                    <!-- Match Score -->
+                                    <div class="ml-3 flex items-center">
+                                        <span class="px-2.5 py-0.5 rounded-full text-sm font-medium
+                                            {% if result.score > 0.8 %}bg-green-100 text-green-800
+                                            {% elif result.score > 0.5 %}bg-yellow-100 text-yellow-800
+                                            {% else %}bg-gray-100 text-gray-800{% endif %}">
+                                            {{ (result.score * 100)|round(1) }}% match
+                                        </span>
                                     </div>
                                 </div>
 

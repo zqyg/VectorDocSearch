@@ -33,9 +33,9 @@ app.config['MAX_CONTENT_LENGTH'] = MAX_CONTENT_LENGTH
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 # Pinecone configuration
-PINECONE_API_KEY = os.environ.get('PINECONE_API_KEY', 'pcsk_3j8EYZ_aXgqmciqjA3fhuBgq8bBz2G1cYFbZ4PRdnrMwwres9UsRUPdYjgyKKHH2a7Uz3')
+PINECONE_API_KEY = os.environ.get('PINECONE_API_KEY', 'pcsk_4Voo5e_ooC5BBCLdcNdKjZBim3aXf4FnLgvUGv6xmzg515BqmgSZRiFY8ERZV7msbiEwa')
 PINECONE_ENVIRONMENT = os.environ.get('PINECONE_ENVIRONMENT', 'us-west1-gcp')
-PINECONE_INDEX = os.environ.get('PINECONE_INDEX', 'ragdata')
+PINECONE_INDEX = os.environ.get('PINECONE_INDEX', 'student')
 HUGGINGFACE_TOKEN = os.environ.get('HUGGINGFACE_TOKEN', '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')
 
 # Initialize Pinecone
@@ -236,32 +236,44 @@ def search():
                 query_embedding = get_embedding(query)
 
                 if query_embedding:
-                    # Search in Pinecone
+                    # Search in Pinecone with enhanced parameters
                     search_results = index.query(
                         vector=query_embedding,
-                        top_k=10,
-                        include_metadata=True
+                        top_k=50,  # Increased to get more potential matches
+                        include_metadata=True,
+                        include_values=True  # Include embeddings for score calculations
                     )
 
-                    # Process results
-                    for match in search_results['matches']:
-                        if match['score'] > 0.7:  # Only show relevant results
+                    # Process results with 20% minimum threshold
+                    for idx, match in enumerate(search_results['matches'], 1):
+                        relevance_score = match['score']
+                        
+                        if relevance_score > 0.2:  # Show results with >20% match
                             metadata = match['metadata']
+                            
+                            # Calculate confidence level
+                            confidence = "High" if relevance_score > 0.8 else \
+                                       "Medium" if relevance_score > 0.5 else "Low"
+                            
                             results.append({
+                                'rank': idx,
                                 'filename': metadata.get('original_filename', 'Unknown'),
                                 'description': metadata.get('description', ''),
-                                'score': round(match['score'], 3),
+                                'score': round(relevance_score, 3),
+                                'confidence': confidence,
                                 'upload_date': metadata.get('upload_date', ''),
                                 'download_filename': metadata.get('filename', ''),
                                 'file_size': metadata.get('file_size', 0)
                             })
 
+                    # Sort results by score in descending order
+                    results.sort(key=lambda x: x['score'], reverse=True)
+
                     if not results:
                         flash('No relevant documents found for your query', 'info')
+                        app.logger.info(f"No results found for query: '{query}'")
                     else:
-                        app.logger.info(f"Search completed: {len(results)} results for query '{query}'")
-                else:
-                    flash('Failed to process search query', 'error')
+                        app.logger.info(f"Search completed: {len(results)} results (>20% match) for query '{query}'")
 
             except Exception as e:
                 app.logger.error(f"Error during search: {str(e)}")
