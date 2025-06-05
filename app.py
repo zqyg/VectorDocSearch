@@ -33,9 +33,9 @@ app.config['MAX_CONTENT_LENGTH'] = MAX_CONTENT_LENGTH
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 # Pinecone configuration
-PINECONE_API_KEY = os.environ.get('PINECONE_API_KEY', 'pcsk_3j8EYZ_aXgqmciqjA3fhuBgq8bBz2G1cYFbZ4PRdnrMwwres9UsRUPdYjgyKKHH2a7Uz3')
+PINECONE_API_KEY = os.environ.get('PINECONE_API_KEY', 'pcsk_4Voo5e_ooC5BBCLdcNdKjZBim3aXf4FnLgvUGv6xmzg515BqmgSZRiFY8ERZV7msbiEwa')
 PINECONE_ENVIRONMENT = os.environ.get('PINECONE_ENVIRONMENT', 'us-west1-gcp')
-PINECONE_INDEX = os.environ.get('PINECONE_INDEX', 'ragdata')
+PINECONE_INDEX = os.environ.get('PINECONE_INDEX', 'student')
 HUGGINGFACE_TOKEN = os.environ.get('HUGGINGFACE_TOKEN', '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')
 
 # Initialize Pinecone
@@ -45,10 +45,15 @@ index = None
 try:
     if PINECONE_API_KEY:
         pc = Pinecone(api_key=PINECONE_API_KEY)
-        
+
         # Check if index exists, create if it doesn't
-        existing_indexes = pc.list_indexes().names()
-        if PINECONE_INDEX not in existing_indexes:
+        try:
+            # Try to describe the index first to see if it exists
+            index_info = pc.describe_index(PINECONE_INDEX)
+            app.logger.info(f"Index {PINECONE_INDEX} already exists")
+        except Exception:
+            # Index doesn't exist, create it
+            app.logger.info(f"Creating index {PINECONE_INDEX}")
             pc.create_index(
                 name=PINECONE_INDEX,
                 dimension=384,  # all-MiniLM-L6-v2 embedding dimension
@@ -58,8 +63,13 @@ try:
                     region='us-west1'
                 )
             )
-        
+            # Wait for index to be ready
+            import time
+            time.sleep(10)
+
+        # Get the index
         index = pc.Index(PINECONE_INDEX)
+
         app.logger.info(f"Successfully connected to Pinecone index: {PINECONE_INDEX}")
     else:
         app.logger.warning("PINECONE_API_KEY not found in environment variables")
@@ -85,15 +95,15 @@ def get_embedding(text):
     try:
         # Use Gradio client for Hugging Face embedding service with authentication
         from gradio_client import Client
-        
+
         client = Client("ZQqqqygy/embeddingservice", hf_token=HUGGINGFACE_TOKEN)
         result = client.predict(
             text=text,
             api_name="/predict"
         )
-        
+
         app.logger.debug(f"Embedding service returned: {type(result)} - {result}")
-        
+
         # Handle different result formats from Hugging Face service
         if isinstance(result, list):
             return result
@@ -113,13 +123,13 @@ def get_embedding(text):
         else:
             app.logger.error(f"Unexpected embedding result format: {type(result)} - {result}")
             return None
-            
+
     except Exception as e:
         app.logger.error(f"Error getting embedding: {str(e)}")
         return None
 
 @app.route('/')
-def index():
+def index_route():
     """Home page - redirect to upload"""
     return redirect(url_for('upload'))
 
@@ -131,38 +141,38 @@ def upload():
         if 'file' not in request.files:
             flash('No file selected', 'error')
             return redirect(request.url)
-        
+
         file = request.files['file']
         description = request.form.get('description', '').strip()
-        
+
         if file.filename == '':
             flash('No file selected', 'error')
             return redirect(request.url)
-        
+
         if not description:
             flash('Please provide a description for the document', 'error')
             return redirect(request.url)
-        
+
         if file and file.filename and allowed_file(file.filename):
             try:
                 # Secure the filename
                 original_filename = file.filename or "unknown"
                 filename = secure_filename(original_filename)
-                
+
                 # Add timestamp to prevent filename conflicts
                 timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_')
                 filename = timestamp + filename
-                
+
                 # Save file
                 filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
                 file.save(filepath)
-                
+
                 # Get file hash for unique ID
                 file_hash = get_file_hash(filepath)
-                
+
                 # Get embedding for description
                 embedding = get_embedding(description)
-                
+
                 if embedding and index:
                     # Store in Pinecone
                     metadata = {
@@ -172,18 +182,26 @@ def upload():
                         'upload_date': datetime.now().isoformat(),
                         'file_size': os.path.getsize(filepath)
                     }
-                    
+
                     # Upsert to Pinecone
-                    index.upsert([(file_hash, embedding, metadata)])
-                    
+                    index.upsert(
+                        vectors=[
+                            {
+                                "id": file_hash,
+                                "values": embedding,
+                                "metadata": metadata
+                            }
+                        ]
+                    )
+
                     flash(f'Document "{file.filename}" uploaded successfully!', 'success')
                     app.logger.info(f"Document uploaded and indexed: {filename}")
                 else:
                     flash('Document uploaded but indexing failed. Search may not work properly.', 'warning')
                     app.logger.warning(f"Document uploaded but not indexed: {filename}")
-                
+
                 return redirect(url_for('upload'))
-                
+
             except Exception as e:
                 app.logger.error(f"Error uploading file: {str(e)}")
                 flash('An error occurred while uploading the file', 'error')
@@ -191,7 +209,7 @@ def upload():
         else:
             flash('Invalid file type. Please upload PDF, DOC, DOCX, or TXT files only.', 'error')
             return redirect(request.url)
-    
+
     return render_template('upload.html')
 
 @app.route('/search', methods=['GET', 'POST'])
@@ -199,10 +217,10 @@ def search():
     """Handle document search"""
     results = []
     query = ''
-    
+
     if request.method == 'POST':
         query = request.form.get('query', '').strip()
-        
+
         if not query:
             flash('Please enter a search query', 'error')
         elif not index:
@@ -211,7 +229,7 @@ def search():
             try:
                 # Get embedding for search query
                 query_embedding = get_embedding(query)
-                
+
                 if query_embedding:
                     # Search in Pinecone
                     search_results = index.query(
@@ -219,7 +237,7 @@ def search():
                         top_k=10,
                         include_metadata=True
                     )
-                    
+
                     # Process results
                     for match in search_results['matches']:
                         if match['score'] > 0.7:  # Only show relevant results
@@ -232,18 +250,18 @@ def search():
                                 'download_filename': metadata.get('filename', ''),
                                 'file_size': metadata.get('file_size', 0)
                             })
-                    
+
                     if not results:
                         flash('No relevant documents found for your query', 'info')
                     else:
                         app.logger.info(f"Search completed: {len(results)} results for query '{query}'")
                 else:
                     flash('Failed to process search query', 'error')
-                    
+
             except Exception as e:
                 app.logger.error(f"Error during search: {str(e)}")
                 flash('An error occurred while searching', 'error')
-    
+
     return render_template('search.html', results=results, query=query)
 
 @app.route('/download/<filename>')
@@ -274,7 +292,7 @@ def too_large(e):
 @app.errorhandler(404)
 def not_found(e):
     return render_template('base.html', 
-                         title='Page Not Found',
+                         title='Page raNot Found',
                          content='<div class="text-center"><h1 class="text-2xl font-bold mb-4">Page Not Found</h1><p>The page you are looking for does not exist.</p></div>'), 404
 
 @app.errorhandler(500)
