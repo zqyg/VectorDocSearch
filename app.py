@@ -4,7 +4,7 @@ from flask import Flask, render_template, request, redirect, url_for, flash, sen
 from werkzeug.utils import secure_filename
 from werkzeug.middleware.proxy_fix import ProxyFix
 import requests
-import pinecone
+from pinecone import Pinecone, ServerlessSpec
 from dotenv import load_dotenv
 import hashlib
 import uuid
@@ -33,29 +33,36 @@ app.config['MAX_CONTENT_LENGTH'] = MAX_CONTENT_LENGTH
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 # Pinecone configuration
-PINECONE_API_KEY = os.environ.get('PINECONE_API_KEY')
-PINECONE_ENVIRONMENT = os.environ.get('PINECONE_ENVIRONMENT', 'us-east-1-aws')
-PINECONE_INDEX = os.environ.get('PINECONE_INDEX', 'document-search')
-EMBEDDING_API_URL = os.environ.get('EMBEDDING_API_URL', 'https://api.openai.com/v1/embeddings')
+PINECONE_API_KEY = os.environ.get('PINECONE_API_KEY', 'pcsk_4Voo5e_ooC5BBCLdcNdKjZBim3aXf4FnLgvUGv6xmzg515BqmgSZRiFY8ERZV7msbiEwa')
+PINECONE_ENVIRONMENT = os.environ.get('PINECONE_ENVIRONMENT', 'us-east-1')
+PINECONE_INDEX = os.environ.get('PINECONE_INDEX', 'student')
+EMBEDDING_API_URL = os.environ.get('EMBEDDING_API_URL', 'https://zqqqqygy-embeddingservice.hf.space')
 
 # Initialize Pinecone
+pc = None
+index = None
+
 try:
     if PINECONE_API_KEY:
-        pinecone.init(api_key=PINECONE_API_KEY, environment=PINECONE_ENVIRONMENT)
+        pc = Pinecone(api_key=PINECONE_API_KEY)
         
         # Check if index exists, create if it doesn't
-        if PINECONE_INDEX not in pinecone.list_indexes():
-            pinecone.create_index(
-                PINECONE_INDEX,
-                dimension=1536,  # OpenAI embedding dimension
-                metric="cosine"
+        existing_indexes = pc.list_indexes().names()
+        if PINECONE_INDEX not in existing_indexes:
+            pc.create_index(
+                name=PINECONE_INDEX,
+                dimension=384,  # all-MiniLM-L6-v2 embedding dimension
+                metric="cosine",
+                spec=ServerlessSpec(
+                    cloud='aws',
+                    region='us-east-1'
+                )
             )
         
-        index = pinecone.Index(PINECONE_INDEX)
+        index = pc.Index(PINECONE_INDEX)
         app.logger.info(f"Successfully connected to Pinecone index: {PINECONE_INDEX}")
     else:
         app.logger.warning("PINECONE_API_KEY not found in environment variables")
-        index = None
 except Exception as e:
     app.logger.error(f"Failed to initialize Pinecone: {str(e)}")
     index = None
@@ -74,26 +81,22 @@ def get_file_hash(filepath):
     return hasher.hexdigest()
 
 def get_embedding(text):
-    """Get embedding from external API"""
+    """Get embedding from Hugging Face hosted service"""
     try:
-        # Example for OpenAI API format - adjust based on your actual API
-        headers = {
-            'Content-Type': 'application/json',
-            'Authorization': f'Bearer {os.environ.get("OPENAI_API_KEY", "placeholder-key")}'
-        }
+        # Use Gradio client for Hugging Face embedding service
+        from gradio_client import Client
         
-        data = {
-            'input': text,
-            'model': 'text-embedding-ada-002'
-        }
+        client = Client("ZQqqqygy/embeddingservice")
+        result = client.predict(
+            text=text,
+            api_name="/predict"
+        )
         
-        response = requests.post(EMBEDDING_API_URL, json=data, headers=headers, timeout=30)
-        
-        if response.status_code == 200:
-            result = response.json()
-            return result['data'][0]['embedding']
+        # Result should be a list of embeddings
+        if isinstance(result, list):
+            return result
         else:
-            app.logger.error(f"Embedding API error: {response.status_code} - {response.text}")
+            app.logger.error(f"Unexpected embedding result format: {type(result)}")
             return None
             
     except Exception as e:
@@ -125,10 +128,11 @@ def upload():
             flash('Please provide a description for the document', 'error')
             return redirect(request.url)
         
-        if file and allowed_file(file.filename):
+        if file and file.filename and allowed_file(file.filename):
             try:
                 # Secure the filename
-                filename = secure_filename(file.filename)
+                original_filename = file.filename or "unknown"
+                filename = secure_filename(original_filename)
                 
                 # Add timestamp to prevent filename conflicts
                 timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_')
