@@ -1,0 +1,226 @@
+/* Custom CSS for Document Search Application */
+
+:root {
+    --primary-50: #eff6ff;
+    --primary-500: #3b82f6;
+    --primary-600: #2563eb;
+    --primary-700: #1d4ed8;
+    --success-50: #f0fdf4;
+    --success-500: #22c55e;
+    --error-50: #fef2f2;
+    --error-500: #ef4444;
+    --warning-50: #fffbeb;
+    --warning-500: #f59e0b;
+    --info-50: #f0f9ff;
+    --info-500: #06b6d4;
+}
+
+/* Navigation Styles */
+.nav-link {
+    @apply px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 transition-colors;
+}
+
+.nav-link.active {
+    @apply text-primary-700 bg-primary-50;
+}
+
+/* Flash Messages */
+.flash-message {
+    @apply flex items-center justify-between p-4 rounded-md mb-2 text-sm;
+}
+
+.flash-success {
+    @apply bg-green-50 text-green-800 border border-green-200;
+}
+
+.flash-error {
+    @apply bg-red-50 text-red-800 border border-red-200;
+}
+
+.flash-warning {
+    @apply bg-yellow-50 text-yellow-800 border border-yellow-200;
+}
+
+.flash-info {
+    @apply bg-blue-50 text-blue-800 border border-blue-200;
+}
+
+/* Form Enhancements */
+.form-input {
+    @apply block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500;
+}
+
+.form-textarea {
+    @apply block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 resize-vertical;
+}
+
+/* File Upload Enhancements */
+#dropZone.dragover {
+    @apply border-primary-500 bg-primary-50;
+}
+
+#fileInfo {
+    @apply flex items-center p-3 bg-gray-50 rounded-md border;
+}
+
+/* Search Examples */
+.search-example {
+    @apply px-3 py-1 text-xs bg-gray-100 text-gray-700 rounded-full hover:bg-gray-200 transition-colors cursor-pointer;
+}
+
+.search-example:hover {
+    @apply bg-primary-100 text-primary-700;
+}
+
+/* Loading States */
+.loading {
+    @apply opacity-50 pointer-events-none;
+}
+
+.loading::after {
+    content: '';
+    @apply absolute inset-0 bg-white bg-opacity-50;
+}
+
+/* Button Variants */
+.btn-primary {
+    @apply inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500;
+}
+
+.btn-secondary {
+    @apply inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500;
+}
+
+/* Result Cards */
+.result-card {
+    @apply bg-white rounded-lg shadow-sm border p-6 hover:shadow-md transition-shadow;
+}
+
+.result-card:hover {
+    @apply shadow-md;
+}
+
+/* Score Badge */
+.score-badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+}
+
+.score-high {
+    @apply bg-green-100 text-green-800;
+}
+
+.score-medium {
+    @apply bg-yellow-100 text-yellow-800;
+}
+
+.score-low {
+    @apply bg-gray-100 text-gray-800;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 640px) {
+    .nav-link {
+        @apply text-xs px-2 py-1;
+    }
+    
+    .flash-message {
+        @apply text-xs p-3;
+    }
+    
+    .result-card {
+        @apply p-4;
+    }
+}
+
+/* Animation Classes */
+.fade-in {
+    animation: fadeIn 0.3s ease-in-out;
+}
+
+.slide-in {
+    animation: slideIn 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes slideIn {
+    from { 
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to { 
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* File Type Icons */
+.file-icon {
+    @apply w-6 h-6 flex-shrink-0;
+}
+
+/* Progress Bar */
+.progress-bar {
+    @apply w-full bg-gray-200 rounded-full h-2;
+}
+
+.progress-bar-fill {
+    @apply bg-primary-600 h-2 rounded-full transition-all duration-300;
+}
+
+/* Tooltip */
+.tooltip {
+    @apply absolute z-10 px-2 py-1 text-xs text-white bg-gray-900 rounded shadow-lg opacity-0 pointer-events-none transition-opacity;
+}
+
+.tooltip.show {
+    @apply opacity-100;
+}
+
+/* Empty State */
+.empty-state {
+    @apply text-center py-12;
+}
+
+.empty-state-icon {
+    @apply w-16 h-16 mx-auto mb-4 text-gray-400;
+}
+
+/* Status Indicators */
+.status-online {
+    @apply w-3 h-3 bg-green-500 rounded-full;
+}
+
+.status-offline {
+    @apply w-3 h-3 bg-red-500 rounded-full;
+}
+
+.status-warning {
+    @apply w-3 h-3 bg-yellow-500 rounded-full;
+}
+
+/* Custom Scrollbar */
+.custom-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e0 #f7fafc;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+    background: #f7fafc;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #cbd5e0;
+    border-radius: 3px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #a0aec0;
+}

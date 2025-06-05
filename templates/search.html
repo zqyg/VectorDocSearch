@@ -1,0 +1,202 @@
+{% extends "base.html" %}
+
+{% block title %}Search Documents - Document Search{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+    <!-- Header -->
+    <div class="text-center mb-8">
+        <div class="inline-flex items-center justify-center w-16 h-16 bg-green-100 rounded-full mb-4">
+            <i class="fas fa-search text-2xl text-green-600"></i>
+        </div>
+        <h1 class="text-3xl font-bold text-gray-900 mb-2">Search Documents</h1>
+        <p class="text-gray-600">
+            Use natural language to find relevant documents. Our semantic search understands context and meaning.
+        </p>
+    </div>
+
+    <!-- Search Form -->
+    <div class="bg-white rounded-lg shadow-sm border p-6 mb-8">
+        <form method="POST" id="searchForm">
+            <div class="flex flex-col sm:flex-row gap-4">
+                <div class="flex-1">
+                    <label for="query" class="sr-only">Search Query</label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <i class="fas fa-search text-gray-400"></i>
+                        </div>
+                        <input 
+                            type="text" 
+                            id="query" 
+                            name="query" 
+                            class="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
+                            placeholder="e.g., 'Physics questions about motion and kinetics' or 'Marketing assignment on consumer behavior'"
+                            value="{{ query }}"
+                            required
+                        >
+                    </div>
+                </div>
+                <button 
+                    type="submit" 
+                    class="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                    id="searchBtn"
+                >
+                    <i class="fas fa-search mr-2"></i>
+                    Search
+                </button>
+            </div>
+        </form>
+
+        <!-- Search Examples -->
+        <div class="mt-4 flex flex-wrap gap-2">
+            <span class="text-sm text-gray-500">Try searching for:</span>
+            <button type="button" class="search-example" data-query="Physics practice questions">
+                Physics practice questions
+            </button>
+            <button type="button" class="search-example" data-query="Math homework solutions">
+                Math homework solutions
+            </button>
+            <button type="button" class="search-example" data-query="History essay topics">
+                History essay topics
+            </button>
+        </div>
+    </div>
+
+    <!-- Search Results -->
+    {% if results %}
+        <div class="bg-white rounded-lg shadow-sm border">
+            <div class="p-6 border-b">
+                <h2 class="text-xl font-semibold text-gray-900">
+                    <i class="fas fa-list-alt mr-2 text-green-600"></i>
+                    Search Results
+                    <span class="text-sm font-normal text-gray-500 ml-2">({{ results|length }} documents found)</span>
+                </h2>
+            </div>
+            
+            <div class="divide-y divide-gray-200">
+                {% for result in results %}
+                    <div class="p-6 hover:bg-gray-50 transition-colors">
+                        <div class="flex items-start justify-between">
+                            <div class="flex-1 min-w-0">
+                                <!-- Document Header -->
+                                <div class="flex items-center mb-2">
+                                    <div class="flex-shrink-0">
+                                        {% set ext = result.filename.split('.')[-1].lower() %}
+                                        {% if ext == 'pdf' %}
+                                            <i class="fas fa-file-pdf text-red-500 text-lg"></i>
+                                        {% elif ext in ['doc', 'docx'] %}
+                                            <i class="fas fa-file-word text-blue-500 text-lg"></i>
+                                        {% else %}
+                                            <i class="fas fa-file-alt text-gray-500 text-lg"></i>
+                                        {% endif %}
+                                    </div>
+                                    <h3 class="ml-3 text-lg font-medium text-gray-900 truncate">
+                                        {{ result.filename }}
+                                    </h3>
+                                    <div class="ml-3 flex items-center text-sm text-green-600">
+                                        <i class="fas fa-chart-bar mr-1"></i>
+                                        <span>{{ (result.score * 100)|round(1) }}% match</span>
+                                    </div>
+                                </div>
+
+                                <!-- Description -->
+                                <p class="text-gray-700 text-sm mb-3 leading-relaxed">
+                                    {{ result.description }}
+                                </p>
+
+                                <!-- Metadata -->
+                                <div class="flex items-center text-xs text-gray-500 space-x-4">
+                                    {% if result.upload_date %}
+                                        <span>
+                                            <i class="fas fa-calendar mr-1"></i>
+                                            Uploaded {{ result.upload_date[:10] }}
+                                        </span>
+                                    {% endif %}
+                                    {% if result.file_size %}
+                                        <span>
+                                            <i class="fas fa-weight mr-1"></i>
+                                            {{ (result.file_size / 1024 / 1024)|round(2) }} MB
+                                        </span>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            <!-- Download Button -->
+                            <div class="ml-6 flex-shrink-0">
+                                <a 
+                                    href="{{ url_for('download_file', filename=result.download_filename) }}" 
+                                    class="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                                >
+                                    <i class="fas fa-download mr-2"></i>
+                                    Download
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    {% elif query %}
+        <!-- No Results -->
+        <div class="text-center py-12">
+            <div class="inline-flex items-center justify-center w-16 h-16 bg-gray-100 rounded-full mb-4">
+                <i class="fas fa-search text-2xl text-gray-400"></i>
+            </div>
+            <h3 class="text-lg font-medium text-gray-900 mb-2">No documents found</h3>
+            <p class="text-gray-500 mb-6">
+                No documents match your search query. Try different keywords or upload more documents.
+            </p>
+            <div class="flex justify-center space-x-4">
+                <a 
+                    href="{{ url_for('upload') }}" 
+                    class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700"
+                >
+                    <i class="fas fa-plus mr-2"></i>
+                    Upload Document
+                </a>
+                <button 
+                    type="button" 
+                    onclick="document.getElementById('query').value=''; document.getElementById('query').focus();"
+                    class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                >
+                    <i class="fas fa-redo mr-2"></i>
+                    Try Again
+                </button>
+            </div>
+        </div>
+    {% else %}
+        <!-- Initial State -->
+        <div class="bg-gradient-to-br from-blue-50 to-indigo-100 rounded-lg p-8">
+            <div class="text-center">
+                <h3 class="text-lg font-medium text-gray-900 mb-4">
+                    <i class="fas fa-magic mr-2 text-primary-600"></i>
+                    Semantic Search Power
+                </h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm">
+                    <div class="bg-white p-4 rounded-lg shadow-sm">
+                        <div class="text-primary-600 mb-2">
+                            <i class="fas fa-brain text-lg"></i>
+                        </div>
+                        <h4 class="font-medium mb-1">Understands Context</h4>
+                        <p class="text-gray-600">Search by meaning, not just keywords</p>
+                    </div>
+                    <div class="bg-white p-4 rounded-lg shadow-sm">
+                        <div class="text-green-600 mb-2">
+                            <i class="fas fa-language text-lg"></i>
+                        </div>
+                        <h4 class="font-medium mb-1">Natural Language</h4>
+                        <p class="text-gray-600">Ask questions in plain English</p>
+                    </div>
+                    <div class="bg-white p-4 rounded-lg shadow-sm">
+                        <div class="text-purple-600 mb-2">
+                            <i class="fas fa-bullseye text-lg"></i>
+                        </div>
+                        <h4 class="font-medium mb-1">Relevant Results</h4>
+                        <p class="text-gray-600">Find exactly what you need</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}
