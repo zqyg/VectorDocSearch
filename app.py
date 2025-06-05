@@ -92,11 +92,26 @@ def get_embedding(text):
             api_name="/predict"
         )
         
-        # Result should be a list of embeddings
+        app.logger.debug(f"Embedding service returned: {type(result)} - {result}")
+        
+        # Handle different result formats from Hugging Face service
         if isinstance(result, list):
             return result
+        elif isinstance(result, dict):
+            # If it's a dict, try to extract the embedding data
+            if 'data' in result:
+                return result['data']
+            elif 'embedding' in result:
+                return result['embedding']
+            elif len(result) == 1:
+                # If dict has one key, return its value
+                key = list(result.keys())[0]
+                return result[key]
+            else:
+                app.logger.error(f"Dictionary result without expected keys: {result}")
+                return None
         else:
-            app.logger.error(f"Unexpected embedding result format: {type(result)}")
+            app.logger.error(f"Unexpected embedding result format: {type(result)} - {result}")
             return None
             
     except Exception as e:
