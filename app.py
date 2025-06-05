@@ -33,9 +33,9 @@ app.config['MAX_CONTENT_LENGTH'] = MAX_CONTENT_LENGTH
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 # Pinecone configuration
-PINECONE_API_KEY = os.environ.get('PINECONE_API_KEY', 'pcsk_4Voo5e_ooC5BBCLdcNdKjZBim3aXf4FnLgvUGv6xmzg515BqmgSZRiFY8ERZV7msbiEwa')
+PINECONE_API_KEY = os.environ.get('PINECONE_API_KEY', 'pcsk_3j8EYZ_aXgqmciqjA3fhuBgq8bBz2G1cYFbZ4PRdnrMwwres9UsRUPdYjgyKKHH2a7Uz3')
 PINECONE_ENVIRONMENT = os.environ.get('PINECONE_ENVIRONMENT', 'us-west1-gcp')
-PINECONE_INDEX = os.environ.get('PINECONE_INDEX', 'student')
+PINECONE_INDEX = os.environ.get('PINECONE_INDEX', 'ragdata')
 HUGGINGFACE_TOKEN = os.environ.get('HUGGINGFACE_TOKEN', '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')
 
 # Initialize Pinecone
@@ -184,15 +184,20 @@ def upload():
                     }
 
                     # Upsert to Pinecone
-                    index.upsert(
-                        vectors=[
-                            {
-                                "id": file_hash,
-                                "values": embedding,
-                                "metadata": metadata
-                            }
-                        ]
-                    )
+                    try:
+                        index.upsert(
+                            vectors=[
+                                {
+                                    "id": file_hash,
+                                    "values": embedding,
+                                    "metadata": metadata
+                                }
+                            ]
+                        )
+                        app.logger.info(f"Successfully indexed document with ID: {file_hash}")
+                    except Exception as pinecone_error:
+                        app.logger.error(f"Pinecone upsert failed: {str(pinecone_error)}")
+                        raise pinecone_error
 
                     flash(f'Document "{file.filename}" uploaded successfully!', 'success')
                     app.logger.info(f"Document uploaded and indexed: {filename}")
