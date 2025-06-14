@@ -1,0 +1,294 @@
+{% extends "base.html" %}
+
+{% block title %}Admin - Import from Google Drive{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <!-- Admin Dashboard Header -->
+    <div class="text-center mb-12">
+        <h1 class="text-3xl font-bold text-gray-800">Document Management Dashboard</h1>
+        <p class="text-gray-600 mt-2">Import and manage documents from Google Drive</p>
+    </div>
+
+    <!-- Main Content Grid -->
+    <div class="container mx-auto">
+        <!-- Import Section -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <div class="flex items-center mb-6">
+                <i class="fas fa-cloud-download-alt text-blue-500 text-2xl mr-3"></i>
+                <h2 class="text-xl font-semibold text-gray-800">Bulk Import</h2>
+            </div>
+            <form id="importForm" method="post" action="{{ url_for('admin_import_drive') }}">
+                <button type="submit"
+                    class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-6 rounded-lg transition duration-150 ease-in-out flex items-center justify-center gap-2 shadow-sm">
+                    <i class="fas fa-cloud-download-alt"></i>
+                    Import All Document + JSON Pairs
+                </button>
+            </form>
+            <div id="importLog" class="mt-6 bg-gray-50 rounded-lg p-4 text-sm text-gray-700 border border-gray-200 hidden"></div>
+        </div>
+
+        <!-- Document List -->
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <div class="flex items-center mb-6">
+                <i class="fas fa-file-import text-green-500 text-2xl mr-3"></i>
+                <h2 class="text-xl font-semibold text-gray-800">Document List</h2>
+            </div>
+            <div id="systemPanel" class="mb-6">
+                <div class="flex items-center justify-center h-32 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+                    <div class="text-gray-500">
+                        <i class="fas fa-spinner fa-spin mr-2"></i>
+                        Loading documents...
+                    </div>
+                </div>
+            </div>
+            <button id="moveSelectedBtn"
+                class="w-full mt-4 bg-green-600 hover:bg-green-700 text-white font-medium py-3 px-6 rounded-lg transition duration-150 ease-in-out flex items-center justify-center gap-2 shadow-sm hidden"
+                disabled>
+                <i class="fas fa-arrow-right"></i>
+                Move Selected to Import Folder
+            </button>
+            <div id="moveLog" class="mt-6 bg-gray-50 rounded-lg p-4 text-sm text-gray-700 border border-gray-200 hidden"></div>
+            <div id="selectedFilesList" class="mt-4 bg-gray-50 p-4 rounded-lg hidden">
+                <div class="flex justify-between items-center mb-2">
+                    <h3 class="text-sm font-medium text-gray-700">Selected documents:</h3>
+                    <span id="selectedCount" class="text-sm text-gray-500">0 selected</span>
+                </div>
+                <div id="selectedFilesContainer" class="space-y-2"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+async function loadSystemPanel() {
+    const panel = document.getElementById('systemPanel');
+    panel.innerHTML = `
+        <div class="flex items-center justify-center h-32 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+            <div class="text-gray-500">
+                <i class="fas fa-spinner fa-spin mr-2"></i>
+                Loading documents...
+            </div>
+        </div>`;
+    
+    try {
+        const resp = await fetch('/admin/list-drive-docs');
+        if (!resp.ok) {
+            throw new Error(`HTTP error! status: ${resp.status}`);
+        }
+        const data = await resp.json();
+        
+        if (!data.success) {
+            panel.innerHTML = `
+                <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+                    <div class="flex items-center text-red-600 mb-2">
+                        <i class="fas fa-exclamation-circle mr-2"></i>
+                        <span class="font-medium">Error loading documents</span>
+                    </div>
+                    <p class="text-red-600">${data.error || 'Unknown error'}</p>
+                    <button onclick="loadSystemPanel()" class="mt-4 px-4 py-2 bg-red-100 text-red-700 rounded hover:bg-red-200">
+                        <i class="fas fa-redo mr-2"></i>Retry
+                    </button>
+                </div>`;
+            return;
+        }
+        if (data.pairs.length === 0) {
+            panel.innerHTML = '<div class="text-gray-500">No document+json pairs found in the source folder.</div>';
+            return;
+        }
+        let html = `
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th scope="col" class="w-16 px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <input type="checkbox" id="selectAll" class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50">
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Document</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">JSON</th>
+                            <th scope="col" class="w-20 px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Preview</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">`;
+        
+        for (const pair of data.pairs) {
+            html += `
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-4 whitespace-nowrap text-center">
+                        <input type="checkbox" class="doc-checkbox rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50" value="${pair.id}">
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${pair.doc.name}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${pair.json.name}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-center">
+                        <a href="#" onclick="openPreviewInNewTab('${pair.doc.id}', '${pair.doc.name}'); return false;" 
+                           class="text-blue-600 hover:text-blue-800" title="Open preview in new tab">
+                            <i class="fas fa-external-link-alt"></i>
+                        </a>
+                    </td>
+                </tr>`;
+        }
+        
+        html += `
+                    </tbody>
+                </table>
+            </div>`;
+        panel.innerHTML = html;
+        document.getElementById('moveSelectedBtn').classList.remove('hidden');
+        updateMoveBtnState();
+        
+        // Move event listener setup here after table is created
+        const selectAll = document.getElementById('selectAll');
+        if (selectAll) {
+            selectAll.addEventListener('change', function() {
+                document.querySelectorAll('.doc-checkbox').forEach(cb => {
+                    cb.checked = this.checked;
+                });
+                updateMoveBtnState();
+            });
+        }
+        
+        document.querySelectorAll('.doc-checkbox').forEach(cb => {
+            cb.addEventListener('change', function() {
+                const allChecked = Array.from(document.querySelectorAll('.doc-checkbox')).every(cb => cb.checked);
+                if (selectAll) {
+                    selectAll.checked = allChecked;
+                }
+                updateMoveBtnState();
+            });
+        });
+        
+    } catch (error) {
+        console.error('Error loading documents:', error);
+        panel.innerHTML = `
+            <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+                <div class="flex items-center text-red-600 mb-2">
+                    <i class="fas fa-exclamation-circle mr-2"></i>
+                    <span class="font-medium">Error loading documents</span>
+                </div>
+                <p class="text-red-600">Failed to connect to server. Please try again.</p>
+                <button onclick="loadSystemPanel()" class="mt-4 px-4 py-2 bg-red-100 text-red-700 rounded hover:bg-red-200">
+                    <i class="fas fa-redo mr-2"></i>Retry
+                </button>
+            </div>`;
+    }
+}
+
+async function openPreviewInNewTab(fileId, fileName) {
+    try {
+        const response = await fetch(`/admin/get-preview-url/${fileId}`);
+        const data = await response.json();
+        
+        if (data.success) {
+            // Open preview URL in a new tab
+            window.open(data.url, '_blank');
+        } else {
+            showError('Error loading preview: ' + (data.error || 'Unknown error'));
+        }
+    } catch (error) {
+        showError('Error loading preview: ' + error.message);
+    }
+}
+
+function updateMoveBtnState() {
+    const checked = document.querySelectorAll('.doc-checkbox:checked');
+    const btn = document.getElementById('moveSelectedBtn');
+    const selectedFilesList = document.getElementById('selectedFilesList');
+    const selectedCount = document.getElementById('selectedCount');
+    const selectedFilesContainer = document.getElementById('selectedFilesContainer');
+
+    btn.disabled = checked.length === 0;
+
+    // Update selected files list
+    if (checked.length > 0) {
+        selectedFilesList.classList.remove('hidden');
+        selectedCount.textContent = `${checked.length} selected`;
+        
+        selectedFilesContainer.innerHTML = '';
+        checked.forEach(cb => {
+            const row = cb.closest('tr');
+            const fileName = row.querySelector('td:nth-child(2)').textContent;
+            selectedFilesContainer.innerHTML += `
+                <div class="flex items-center justify-between py-1">
+                    <span class="text-sm text-gray-600"><i class="fas fa-file mr-2"></i>${fileName}</span>
+                    <button onclick="deselectFile('${cb.value}')" class="text-gray-400 hover:text-gray-600">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            `;
+        });
+    } else {
+        selectedFilesList.classList.add('hidden');
+    }
+}
+
+function deselectFile(fileId) {
+    const checkbox = document.querySelector(`.doc-checkbox[value="${fileId}"]`);
+    if (checkbox) {
+        checkbox.checked = false;
+        updateMoveBtnState();
+    }
+}
+
+// Update the showPreview function to clear selection if already selected
+function showPreview(fileId, fileName) {
+    const checkbox = document.querySelector(`.doc-checkbox[value="${fileId}"]`);
+    if (checkbox) {
+        checkbox.checked = !checkbox.checked;
+        updateMoveBtnState();
+    }
+}
+
+document.getElementById('moveSelectedBtn').addEventListener('click', async function() {
+    const checked = Array.from(document.querySelectorAll('.doc-checkbox:checked')).map(cb => cb.value);
+    if (checked.length === 0) return;
+    this.disabled = true;
+    this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Moving...';
+    const moveLog = document.getElementById('moveLog');
+    moveLog.classList.remove('hidden');
+    moveLog.textContent = "Moving, please wait...";
+    try {
+        const resp = await fetch('/admin/move-drive-docs', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ids: checked})
+        });
+        const data = await resp.json();
+        if (data.success) {
+            moveLog.innerHTML = "<b>Move Log:</b><br>" + data.log.map(line => `<div>${line}</div>`).join('');
+            await loadSystemPanel();
+        } else {
+            moveLog.innerHTML = "<b>Error:</b> " + (data.error || "Unknown error");
+        }
+    } catch (err) {
+        moveLog.innerHTML = "<b>Error:</b> " + err;
+    }
+    this.disabled = false;
+    this.innerHTML = '<i class="fas fa-arrow-right"></i> Move Selected to Import Folder';
+});
+window.addEventListener('DOMContentLoaded', loadSystemPanel);
+
+document.getElementById('importForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const btn = this.querySelector('button');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Importing...';
+    const logDiv = document.getElementById('importLog');
+    logDiv.classList.remove('hidden');
+    logDiv.textContent = "Importing, please wait...";
+
+    try {
+        const resp = await fetch(this.action, { method: 'POST' });
+        const data = await resp.json();
+        if (data.success) {
+            logDiv.innerHTML = "<b>Import Log:</b><br>" + data.log.map(line => `<div>${line}</div>`).join('');
+        } else {
+            logDiv.innerHTML = "<b>Error:</b> " + (data.error || "Unknown error");
+        }
+    } catch (err) {
+        logDiv.innerHTML = "<b>Error:</b> " + err;
+    }
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-cloud-download-alt"></i> Import All Document + JSON Pairs';
+});
+</script>
+{% endblock %}

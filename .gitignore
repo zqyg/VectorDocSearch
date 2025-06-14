@@ -1,0 +1,23 @@
+# Environment variables
+.env
+.env.*
+
+# Python virtual environment
+venv/
+env/
+__pycache__/
+*.pyc
+
+# Credentials
+drive_credentials.json
+zelio.json
+*.pem
+*.key
+
+# Local development
+uploads/
+.vscode/
+.idea/
+
+# Log files
+*.log

@@ -1,0 +1,6 @@
+Make sure to move files to delete (create a new folder, share with drive credentials and copy id)
+
+
+Make the description in LLM better formatted
+Make the parsing logic better
+Marketing

@@ -1,0 +1,343 @@
+import os
+import logging
+from flask import Flask, render_template, request, redirect, url_for, flash, send_from_directory, jsonify
+from werkzeug.utils import secure_filename
+from werkzeug.middleware.proxy_fix import ProxyFix
+import requests
+from pinecone import Pinecone, ServerlessSpec
+from dotenv import load_dotenv
+import hashlib
+import uuid
+from datetime import datetime, timedelta
+from google.cloud import storage
+
+# Load environment variables
+load_dotenv()
+
+# Configure logging
+logging.basicConfig(level=logging.DEBUG)
+
+# Create Flask app
+app = Flask(__name__)
+app.secret_key = os.environ.get("SESSION_SECRET", "dev-secret-key-change-in-production")
+app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
+
+# Configuration
+UPLOAD_FOLDER = 'uploads'
+ALLOWED_EXTENSIONS = {'pdf', 'doc', 'docx', 'txt'}
+MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB max file size
+
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+app.config['MAX_CONTENT_LENGTH'] = MAX_CONTENT_LENGTH
+
+# Ensure upload directory exists
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+# Pinecone configuration
+PINECONE_API_KEY = os.environ.get('PINECONE_API_KEY', 'pcsk_4Voo5e_ooC5BBCLdcNdKjZBim3aXf4FnLgvUGv6xmzg515BqmgSZRiFY8ERZV7msbiEwa')
+PINECONE_ENVIRONMENT = os.environ.get('PINECONE_ENVIRONMENT', 'us-west1-gcp')
+PINECONE_INDEX = os.environ.get('PINECONE_INDEX', 'student')
+HUGGINGFACE_TOKEN = os.environ.get('HUGGINGFACE_TOKEN', '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')
+
+# Google Cloud Storage configuration
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "zelio.json"
+BUCKET_NAME = "studentpdf"
+
+# Initialize Pinecone and Google Cloud Storage
+pc = None
+index = None
+storage_client = storage.Client()
+bucket = storage_client.bucket(BUCKET_NAME)
+
+try:
+    if PINECONE_API_KEY:
+        pc = Pinecone(api_key=PINECONE_API_KEY)
+
+        # Check if index exists, create if it doesn't
+        try:
+            # Try to describe the index first to see if it exists
+            index_info = pc.describe_index(PINECONE_INDEX)
+            app.logger.info(f"Index {PINECONE_INDEX} already exists")
+        except Exception:
+            # Index doesn't exist, create it
+            app.logger.info(f"Creating index {PINECONE_INDEX}")
+            pc.create_index(
+                name=PINECONE_INDEX,
+                dimension=384,  # all-MiniLM-L6-v2 embedding dimension
+                metric="cosine",
+                spec=ServerlessSpec(
+                    cloud='gcp',
+                    region='us-west1'
+                )
+            )
+            # Wait for index to be ready
+            import time
+            time.sleep(10)
+
+        # Get the index
+        index = pc.Index(PINECONE_INDEX)
+
+        app.logger.info(f"Successfully connected to Pinecone index: {PINECONE_INDEX}")
+    else:
+        app.logger.warning("PINECONE_API_KEY not found in environment variables")
+except Exception as e:
+    app.logger.error(f"Failed to initialize Pinecone: {str(e)}")
+    index = None
+
+def allowed_file(filename):
+    """Check if file extension is allowed"""
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+def get_file_hash(filepath):
+    """Generate hash for file to use as unique ID"""
+    hasher = hashlib.md5()
+    with open(filepath, 'rb') as f:
+        for chunk in iter(lambda: f.read(4096), b""):
+            hasher.update(chunk)
+    return hasher.hexdigest()
+
+def get_embedding(text):
+    """Get embedding from Hugging Face hosted service"""
+    try:
+        # Use Gradio client for Hugging Face embedding service with authentication
+        from gradio_client import Client
+
+        client = Client("ZQqqqygy/embeddingservice", hf_token=HUGGINGFACE_TOKEN)
+        result = client.predict(
+            text=text,
+            api_name="/predict"
+        )
+
+        app.logger.debug(f"Embedding service returned: {type(result)} - {result}")
+
+        # Handle different result formats from Hugging Face service
+        if isinstance(result, list):
+            return result
+        elif isinstance(result, dict):
+            # If it's a dict, try to extract the embedding data
+            if 'data' in result:
+                return result['data']
+            elif 'embedding' in result:
+                return result['embedding']
+            elif len(result) == 1:
+                # If dict has one key, return its value
+                key = list(result.keys())[0]
+                return result[key]
+            else:
+                app.logger.error(f"Dictionary result without expected keys: {result}")
+                return None
+        else:
+            app.logger.error(f"Unexpected embedding result format: {type(result)} - {result}")
+            return None
+
+    except Exception as e:
+        app.logger.error(f"Error getting embedding: {str(e)}")
+        return None
+
+@app.route('/')
+def index_route():
+    """Home page - redirect to upload"""
+    return redirect(url_for('upload'))
+
+@app.route('/upload', methods=['GET', 'POST'])
+def upload():
+    """Handle document upload"""
+    if request.method == 'POST':
+        if 'file' not in request.files:
+            flash('No file selected', 'error')
+            return redirect(request.url)
+
+        file = request.files['file']
+        description = request.form.get('description', '').strip()
+
+        if file.filename == '':
+            flash('No file selected', 'error')
+            return redirect(request.url)
+
+        if not description:
+            flash('Please provide a description for the document', 'error')
+            return redirect(request.url)
+
+        if file and file.filename and allowed_file(file.filename):
+            try:
+                # Secure the filename
+                original_filename = file.filename or "unknown"
+                filename = secure_filename(original_filename)
+
+                # Add timestamp to prevent filename conflicts
+                timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_')
+                filename = timestamp + filename
+
+                # Create a temporary file to get hash
+                temp_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                file.save(temp_path)
+                file_hash = get_file_hash(temp_path)
+
+                # Upload to Google Cloud Storage
+                blob = bucket.blob(filename)
+                blob.upload_from_filename(temp_path)
+                
+                # Remove temporary file
+                os.remove(temp_path)
+
+                # Get embedding for description
+                embedding = get_embedding(description)
+
+                if embedding and index:
+                    # Store in Pinecone with GCS metadata
+                    metadata = {
+                        'filename': filename,
+                        'original_filename': file.filename,
+                        'description': description,
+                        'upload_date': datetime.now().isoformat(),
+                        'file_size': blob.size,
+                        'gcs_path': f"gs://{BUCKET_NAME}/{filename}"
+                    }
+
+                    # Upsert to Pinecone
+                    try:
+                        index.upsert(
+                            vectors=[{
+                                "id": file_hash,
+                                "values": embedding,
+                                "metadata": metadata
+                            }]
+                        )
+                        app.logger.info(f"Successfully indexed document with ID: {file_hash}")
+                    except Exception as pinecone_error:
+                        app.logger.error(f"Pinecone upsert failed: {str(pinecone_error)}")
+                        # Delete from GCS if Pinecone fails
+                        blob.delete()
+                        raise pinecone_error
+
+                    flash(f'Document "{file.filename}" uploaded successfully!', 'success')
+                    app.logger.info(f"Document uploaded and indexed: {filename}")
+                else:
+                    # Delete from GCS if indexing fails
+                    blob.delete()
+                    flash('Document upload failed - indexing error', 'error')
+                    app.logger.warning(f"Document not indexed: {filename}")
+
+                return redirect(url_for('upload'))
+
+            except Exception as e:
+                app.logger.error(f"Error uploading file: {str(e)}")
+                flash('An error occurred while uploading the file', 'error')
+                return redirect(request.url)
+        else:
+            flash('Invalid file type. Please upload PDF, DOC, DOCX, or TXT files only.', 'error')
+            return redirect(request.url)
+
+    return render_template('upload.html')
+
+@app.route('/search', methods=['GET', 'POST'])
+def search():
+    """Handle document search"""
+    results = []
+    query = ''
+
+    if request.method == 'POST':
+        query = request.form.get('query', '').strip()
+
+        if not query:
+            flash('Please enter a search query', 'error')
+        elif not index:
+            flash('Search service is not available. Please check configuration.', 'error')
+        else:
+            try:
+                # Get embedding for search query
+                query_embedding = get_embedding(query)
+
+                if query_embedding:
+                    # Search in Pinecone with enhanced parameters
+                    search_results = index.query(
+                        vector=query_embedding,
+                        top_k=50,  # Increased to get more potential matches
+                        include_metadata=True,
+                        include_values=True  # Include embeddings for score calculations
+                    )
+
+                    # Process results with 20% minimum threshold
+                    for idx, match in enumerate(search_results['matches'], 1):
+                        relevance_score = match['score']
+                        
+                        if relevance_score > 0.2:  # Show results with >20% match
+                            metadata = match['metadata']
+                            
+                            # Calculate confidence level
+                            confidence = "High" if relevance_score > 0.8 else \
+                                       "Medium" if relevance_score > 0.5 else "Low"
+                            
+                            results.append({
+                                'rank': idx,
+                                'filename': metadata.get('original_filename', 'Unknown'),
+                                'description': metadata.get('description', ''),
+                                'score': round(relevance_score, 3),
+                                'confidence': confidence,
+                                'upload_date': metadata.get('upload_date', ''),
+                                'download_filename': metadata.get('filename', ''),
+                                'file_size': metadata.get('file_size', 0)
+                            })
+
+                    # Sort results by score in descending order
+                    results.sort(key=lambda x: x['score'], reverse=True)
+
+                    if not results:
+                        flash('No relevant documents found for your query', 'info')
+                        app.logger.info(f"No results found for query: '{query}'")
+                    else:
+                        app.logger.info(f"Search completed: {len(results)} results (>20% match) for query '{query}'")
+
+            except Exception as e:
+                app.logger.error(f"Error during search: {str(e)}")
+                flash('An error occurred while searching', 'error')
+
+    return render_template('search.html', results=results, query=query)
+
+@app.route('/download/<filename>')
+def download_file(filename):
+    """Download file from Google Cloud Storage using a signed URL"""
+    try:
+        blob = bucket.blob(filename)
+        url = blob.generate_signed_url(
+            version="v4",
+            expiration=timedelta(minutes=15),
+            method="GET"
+        )
+        return redirect(url)
+    except Exception as e:
+        app.logger.error(f"Error downloading file {filename}: {str(e)}")
+        flash('File not found or cannot be downloaded', 'error')
+        return redirect(url_for('search'))
+
+@app.route('/health')
+def health_check():
+    """Health check endpoint"""
+    status = {
+        'status': 'healthy',
+        'pinecone_connected': index is not None,
+        'upload_folder_exists': os.path.exists(UPLOAD_FOLDER)
+    }
+    return jsonify(status)
+
+@app.errorhandler(413)
+def too_large(e):
+    flash('File is too large. Maximum size is 16MB.', 'error')
+    return redirect(url_for('upload'))
+
+@app.errorhandler(404)
+def not_found(e):
+    return render_template('base.html', 
+                         title='Page raNot Found',
+                         content='<div class="text-center"><h1 class="text-2xl font-bold mb-4">Page Not Found</h1><p>The page you are looking for does not exist.</p></div>'), 404
+
+@app.errorhandler(500)
+def server_error(e):
+    app.logger.error(f"Server error: {str(e)}")
+    return render_template('base.html',
+                         title='Server Error', 
+                         content='<div class="text-center"><h1 class="text-2xl font-bold mb-4">Server Error</h1><p>An internal server error occurred.</p></div>'), 500
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000, debug=True)

@@ -11,12 +11,53 @@
         </div>
         <h1 class="text-3xl font-bold text-gray-900 mb-2">Upload Document</h1>
         <p class="text-gray-600">
-            Upload your documents with descriptions to make them searchable using natural language queries.
+            Upload your documents to the system.
         </p>
     </div>
 
     <!-- Upload Form -->
-    <div class="bg-white rounded-lg shadow-sm border p-6">
+    <div class="bg-white rounded-lg shadow-sm border p-6 relative">
+        <!-- Loading Overlay -->
+        <div id="uploadOverlay" class="hidden fixed inset-0 bg-gray-900/50 backdrop-blur-sm z-50 flex items-center justify-center">
+            <div class="bg-white rounded-2xl p-8 shadow-2xl max-w-sm w-full mx-4 transform transition-all">
+                <div class="flex flex-col items-center text-center">
+                    <!-- Initial Upload State -->
+                    <div id="uploadingState">
+                        <div class="relative w-24 h-24 mb-6">
+                            <div class="absolute inset-0 border-t-4 border-primary-500 border-solid rounded-full animate-spin"></div>
+                            <div class="absolute inset-0 border-4 border-primary-100 border-solid rounded-full"></div>
+                            <div class="absolute inset-0 flex items-center justify-center">
+                                <i class="fas fa-file-upload text-primary-500 text-2xl animate-bounce"></i>
+                            </div>
+                        </div>
+                        <h3 class="text-xl font-semibold text-gray-900 mb-2">Uploading Files</h3>
+                        <p class="text-gray-600">Please wait while we upload your files...</p>
+                    </div>
+
+                    <!-- Success State -->
+                    <div id="successState" class="hidden">
+                        <div class="w-24 h-24 mb-6 relative">
+                            <div class="absolute inset-0 flex items-center justify-center">
+                                <i class="fas fa-check-circle text-5xl text-green-500"></i>
+                            </div>
+                        </div>
+                        <h3 class="text-xl font-semibold text-gray-900 mb-2">Upload Successful!</h3>
+                        <p class="text-gray-600 mb-6">Your files have been uploaded successfully.</p>
+                        <div class="text-xs text-gray-500">
+                            <p>Background processing:</p>
+                            <ul class="mt-2 space-y-1">
+                                <li><i class="fas fa-cog fa-spin text-primary-400 mr-1"></i> Generating descriptions</li>
+                                <li><i class="fas fa-cog fa-spin text-primary-400 mr-1"></i> Creating metadata</li>
+                            </ul>
+                        </div>
+                        <button onclick="closeUploadOverlay()" class="mt-6 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors">
+                            Close
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <form method="POST" enctype="multipart/form-data" id="uploadForm">
             <!-- File Upload -->
             <div class="mb-6">
@@ -28,8 +69,8 @@
                     <div class="space-y-1 text-center">
                         <div class="flex text-sm text-gray-600">
                             <label for="file" class="relative cursor-pointer bg-white rounded-md font-medium text-primary-600 hover:text-primary-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-primary-500">
-                                <span>Upload a file</span>
-                                <input id="file" name="file" type="file" class="sr-only" accept=".pdf,.doc,.docx,.txt" required>
+                                <span>Upload files</span>
+                                <input id="file" name="file" type="file" class="sr-only" accept=".pdf,.doc,.docx,.txt" required multiple>
                             </label>
                             <p class="pl-1">or drag and drop</p>
                         </div>
@@ -38,40 +79,23 @@
                         </p>
                     </div>
                 </div>
-                <div id="fileInfo" class="mt-2 hidden">
-                    <div class="flex items-center text-sm text-gray-600">
-                        <i class="fas fa-file-alt mr-2"></i>
-                        <span id="fileName"></span>
-                        <span id="fileSize" class="ml-2 text-gray-400"></span>
+
+                <!-- Selected Files List -->
+                <div id="selectedFilesList" class="mt-4 space-y-2 hidden">
+                    <h4 class="text-sm font-medium text-gray-700">Selected files:</h4>
+                    <div id="filesList" class="space-y-2"></div>
+                    <div class="text-sm text-gray-500 mt-2">
+                        <span id="totalFiles">0</span> files selected
+                        (<span id="totalSize">0 B</span>)
                     </div>
                 </div>
-            </div>
 
-            <!-- Description -->
-            <div class="mb-6">
-                <label for="description" class="block text-sm font-medium text-gray-700 mb-2">
-                    <i class="fas fa-align-left mr-1"></i>
-                    Document Description
-                </label>
-                <textarea 
-                    id="description" 
-                    name="description" 
-                    rows="4" 
-                    class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500" 
-                    placeholder="Provide a detailed description of the document content. This will help others find your document when searching..."
-                    required
-                ></textarea>
-                <p class="mt-1 text-xs text-gray-500">
-                    Be specific about the subject, topics, and type of content to improve searchability.
-                </p>
+                <!-- Error Message -->
+                <div id="fileError" class="hidden mt-2 text-sm text-red-600"></div>
             </div>
 
             <!-- Submit Button -->
-            <div class="flex items-center justify-between">
-                <div class="text-sm text-gray-500">
-                    <i class="fas fa-info-circle mr-1"></i>
-                    Your document will be processed and indexed for search.
-                </div>
+            <div class="flex justify-end">
                 <button 
                     type="submit" 
                     class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -83,31 +107,237 @@
             </div>
         </form>
     </div>
-
-    <!-- Help Section -->
-    <div class="mt-8 bg-blue-50 rounded-lg p-6">
-        <h3 class="text-lg font-medium text-blue-900 mb-3">
-            <i class="fas fa-lightbulb mr-2"></i>
-            Tips for Better Search Results
-        </h3>
-        <ul class="space-y-2 text-sm text-blue-800">
-            <li class="flex items-start">
-                <i class="fas fa-check text-blue-600 mr-2 mt-0.5"></i>
-                <span>Include subject areas, topics, and key concepts in your description</span>
-            </li>
-            <li class="flex items-start">
-                <i class="fas fa-check text-blue-600 mr-2 mt-0.5"></i>
-                <span>Mention the document type (notes, assignment, practice questions, etc.)</span>
-            </li>
-            <li class="flex items-start">
-                <i class="fas fa-check text-blue-600 mr-2 mt-0.5"></i>
-                <span>Add relevant keywords that others might search for</span>
-            </li>
-            <li class="flex items-start">
-                <i class="fas fa-check text-blue-600 mr-2 mt-0.5"></i>
-                <span>Supported formats: PDF, Word documents (.doc, .docx), and text files</span>
-            </li>
-        </ul>
-    </div>
 </div>
+
+<script>
+const selectedFiles = new Map(); // Store selected files with unique IDs
+
+document.getElementById('uploadForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    if (!validateUploadForm()) return;
+
+    const formData = new FormData();
+    selectedFiles.forEach(file => {
+        formData.append('file', file);
+    });
+
+    // Show upload overlay with initial state
+    const uploadOverlay = document.getElementById('uploadOverlay');
+    const uploadingState = document.getElementById('uploadingState');
+    const successState = document.getElementById('successState');
+    uploadOverlay.classList.remove('hidden');
+    uploadingState.classList.remove('hidden');
+    successState.classList.add('hidden');
+    document.getElementById('submitBtn').disabled = true;
+
+    try {
+        const response = await fetch(this.action, {
+            method: 'POST',
+            body: formData
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            // Show success immediately after files are uploaded
+            uploadingState.classList.add('hidden');
+            successState.classList.remove('hidden');
+            
+            // Update success message with upload results
+            const successMessage = document.querySelector('#successState p');
+            successMessage.innerHTML = `${data.message}<br>
+                <span class="text-xs text-gray-500 mt-2">Background processing has started.</span>`;
+            
+            // Clear selected files
+            selectedFiles.clear();
+            updateFilesList();
+        } else {
+            showError(data.error || 'Upload failed. Please try again.');
+            closeUploadOverlay();
+        }
+    } catch (error) {
+        showError('Upload failed: ' + error.message);
+        closeUploadOverlay();
+    }
+});
+
+function closeUploadOverlay() {
+    const uploadOverlay = document.getElementById('uploadOverlay');
+    const uploadingState = document.getElementById('uploadingState');
+    const successState = document.getElementById('successState');
+    
+    uploadOverlay.classList.add('hidden');
+    uploadingState.classList.remove('hidden');
+    successState.classList.add('hidden');
+    document.getElementById('submitBtn').disabled = false;
+}
+
+function handleFiles(files) {
+    const selectedFilesList = document.getElementById('selectedFilesList');
+    const filesList = document.getElementById('filesList');
+    const totalFiles = document.getElementById('totalFiles');
+    const totalSize = document.getElementById('totalSize');
+    const submitBtn = document.getElementById('submitBtn');
+    
+    // Add new files to our map
+    Array.from(files).forEach(file => {
+        const fileId = `file-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        selectedFiles.set(fileId, file);
+    });
+
+    updateFilesList();
+}
+
+function updateFilesList() {
+    const selectedFilesList = document.getElementById('selectedFilesList');
+    const filesList = document.getElementById('filesList');
+    const totalFiles = document.getElementById('totalFiles');
+    const totalSize = document.getElementById('totalSize');
+    const submitBtn = document.getElementById('submitBtn');
+
+    if (selectedFiles.size === 0) {
+        selectedFilesList.classList.add('hidden');
+        submitBtn.disabled = true;
+        return;
+    }
+
+    // Clear and rebuild the list
+    filesList.innerHTML = '';
+    let totalBytes = 0;
+    let allValid = true;
+
+    selectedFiles.forEach((file, fileId) => {
+        const isValid = validateFile(file);
+        totalBytes += file.size;
+        
+        filesList.innerHTML += `
+            <div class="flex items-center justify-between p-2 ${isValid ? 'bg-gray-50' : 'bg-red-50'} rounded-lg">
+                <div class="flex items-center space-x-2">
+                    <i class="fas fa-file text-${isValid ? 'gray' : 'red'}-400"></i>
+                    <span class="text-sm text-${isValid ? 'gray' : 'red'}-700">${file.name}</span>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <span class="text-xs text-${isValid ? 'gray' : 'red'}-500">${formatFileSize(file.size)}</span>
+                    <button type="button" onclick="removeFile('${fileId}')" class="text-gray-400 hover:text-red-500 transition-colors">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+        `;
+        
+        if (!isValid) allValid = false;
+    });
+
+    selectedFilesList.classList.remove('hidden');
+    totalFiles.textContent = selectedFiles.size;
+    totalSize.textContent = formatFileSize(totalBytes);
+    submitBtn.disabled = !allValid || selectedFiles.size === 0;
+    
+    if (!allValid) {
+        showError('One or more files are invalid. Please check the file types and sizes.');
+    }
+}
+
+function removeFile(fileId) {
+    selectedFiles.delete(fileId);
+    updateFilesList();
+}
+
+// Update the validateUploadForm function
+function validateUploadForm() {
+    if (selectedFiles.size === 0) {
+        showError('Please select at least one file to upload');
+        return false;
+    }
+
+    let totalSize = 0;
+    let allValid = true;
+
+    selectedFiles.forEach(file => {
+        totalSize += file.size;
+        if (!validateFile(file)) {
+            allValid = false;
+        }
+    });
+
+    const maxSize = 16 * 1024 * 1024; // 16MB
+    if (totalSize > maxSize) {
+        showError('Total file size must be less than 16MB');
+        return false;
+    }
+
+    if (!allValid) {
+        showError('Please remove invalid files before uploading');
+        return false;
+    }
+
+    return true;
+}
+
+function validateFile(file) {
+    const maxSize = 16 * 1024 * 1024; // 16MB
+    const allowedTypes = ['application/pdf', 'application/msword', 
+                         'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                         'text/plain'];
+    const allowedExtensions = ['.pdf', '.doc', '.docx', '.txt'];
+    
+    if (file.size > maxSize) return false;
+    
+    return allowedTypes.includes(file.type) || 
+           allowedExtensions.some(ext => file.name.toLowerCase().endsWith(ext));
+}
+
+function clearFileSelection() {
+    const fileInput = document.getElementById('file');
+    const selectedFilesList = document.getElementById('selectedFilesList');
+    const filesList = document.getElementById('filesList');
+    const fileError = document.getElementById('fileError');
+    const submitBtn = document.getElementById('submitBtn');
+    
+    fileInput.value = '';
+    selectedFilesList.classList.add('hidden');
+    filesList.innerHTML = '';
+    fileError.classList.add('hidden');
+    submitBtn.disabled = true;
+}
+
+// Update the file input event listener
+document.getElementById('file').addEventListener('change', function(e) {
+    handleFiles(e.target.files);
+});
+
+// Update the dropzone event listeners
+const dropZone = document.getElementById('dropZone');
+if (dropZone) {
+    dropZone.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        dropZone.classList.add('border-primary-400');
+    });
+
+    dropZone.addEventListener('dragleave', function(e) {
+        e.preventDefault();
+        if (!dropZone.contains(e.relatedTarget)) {
+            dropZone.classList.remove('border-primary-400');
+        }
+    });
+
+    dropZone.addEventListener('drop', function(e) {
+        e.preventDefault();
+        dropZone.classList.remove('border-primary-400');
+        
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+            document.getElementById('file').files = files;
+            handleFiles(files);
+        }
+    });
+}
+
+function formatFileSize(bytes) {
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    if (bytes === 0) return '0 Byte';
+    const i = parseInt(Math.floor(Math.log(bytes) / Math.log(1024)));
+    return Math.round(bytes / Math.pow(1024, i), 2) + ' ' + sizes[i];
+}
+</script>
 {% endblock %}
