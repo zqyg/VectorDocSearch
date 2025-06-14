@@ -8,8 +8,7 @@ env/
 __pycache__/
 *.pyc
 
-# Credentials
-drive_credentials.json
+
 zelio.json
 *.pem
 *.key
