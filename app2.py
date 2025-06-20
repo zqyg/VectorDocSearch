@@ -160,8 +160,8 @@ def get_embedding(text, title=None):
 
 @app.route('/')
 def index_route():
-    """Home page - redirect to upload"""
-    return redirect(url_for('upload'))
+    """Home page - render search"""
+    return render_template('search.html')
 
 @app.route('/upload', methods=['GET', 'POST'])
 def upload():
