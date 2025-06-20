@@ -932,16 +932,19 @@ def get_document_description(content, filename):
             "Content-Type": "application/json"
         }
         
-        system_prompt = """You are a document analyzer focused on educational content. 
-        Analyze the given document and create a detailed description that includes:
-        - Subject area and specific topic
-        - IB course level (HL/SL) if identifiable
-        - Type of content (practice questions, notes, essay, etc.)
-        - Year/grade level if mentioned
-        - Any assessment or grade information if present
-        - Key topics or concepts covered
-        Make the description detailed but concise (max 200 words) and focus on making it searchable."""
-        
+        system_prompt = """You are an expert educational content analyst. 
+        Given a document related to IB (International Baccalaureate) studies, generate a clear and informative description suitable for search and retrieval in a vector database. Your description must:
+
+        - Identify the **subject area** and, if possible, the **specific topic**
+        - Specify the **IB level** (HL or SL) if it can be inferred
+        - Describe the **type of content** (e.g., practice questions, lecture notes, model essay, assessment guide)
+        - Mention any **grade level or year** if available
+        - Include any **assessment details, scores, or criteria** if present
+        - Highlight **key concepts, skills, or topics covered** in the material
+
+        The description should be **detailed enough for effective vector search**, but **concise**, with a **maximum of 200 words**. Use clear, academic language and avoid vague generalities. Focus on making it informative, structured, and optimized for relevance in a search context.
+        """
+
         # Truncate content if too long
         max_chars = 14000  # Adjust based on model context window
         content = content[:max_chars]

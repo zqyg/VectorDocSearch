@@ -230,6 +230,32 @@
         </div>
     {% endif %}
 </div>
+
+<!-- Search Loading Overlay -->
+<div id="searchOverlay" class="hidden fixed inset-0 bg-gray-900/50 backdrop-blur-sm z-50 flex items-center justify-center">
+    <div class="bg-white rounded-2xl p-8 shadow-2xl max-w-sm w-full mx-4">
+        <div class="flex flex-col items-center text-center">
+            <div class="relative w-24 h-24 mb-6">
+                <!-- Neural network animation background -->
+                <div class="absolute inset-0 flex items-center justify-center">
+                    <div class="w-16 h-16 bg-primary-100 rounded-full animate-ping opacity-75"></div>
+                </div>
+                <!-- Brain icon -->
+                <div class="absolute inset-0 flex items-center justify-center">
+                    <i class="fas fa-brain text-primary-600 text-3xl animate-pulse"></i>
+                </div>
+            </div>
+            <h3 class="text-xl font-semibold text-gray-900 mb-2">Smart Search in Progress</h3>
+            <p class="text-gray-600">Analyzing your query and searching through the knowledge base...</p>
+            <div class="mt-4 text-sm text-gray-500">
+                <div class="flex items-center gap-2">
+                    <i class="fas fa-circle-notch fa-spin text-primary-500"></i>
+                    <span>Processing semantic meaning</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 <!-- If not extending base.html, add or update the nav bar as follows: -->
@@ -240,3 +266,39 @@
     </a>
     <!-- ...existing code... -->
 </nav>
+
+<script>
+function showSearchOverlay() {
+    const searchOverlay = document.getElementById('searchOverlay');
+    const searchBtn = document.getElementById('searchBtn');
+    
+    searchOverlay.classList.remove('hidden');
+    if (searchBtn) {
+        searchBtn.disabled = true;
+        searchBtn.innerHTML = '<i class="fas fa-circle-notch fa-spin mr-2"></i>Searching...';
+    }
+}
+
+document.getElementById('searchForm').addEventListener('submit', function(e) {
+    const query = document.getElementById('query').value.trim();
+    
+    if (!query) {
+        e.preventDefault();
+        return;
+    }
+    
+    showSearchOverlay();
+});
+
+// Update example search click handlers
+document.querySelectorAll('.search-example').forEach(btn => {
+    btn.addEventListener('click', function() {
+        const query = this.getAttribute('data-query');
+        if (query) {
+            document.getElementById('query').value = query;
+            showSearchOverlay();
+            document.getElementById('searchForm').submit();
+        }
+    });
+});
+</script>
